@@ -27,11 +27,5 @@ namespace TFTP
             FileAlreadyExists = 6,
             NoSuchUser = 7,
         }
-        public enum RequstType
-        {
-            Read = 0,
-            Write = 1,
-            Invalid = 2
-        }
     }
 }

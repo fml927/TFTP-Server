@@ -42,17 +42,21 @@ namespace TFTP
         {
             HandleParams param = (HandleParams)o;
             _semaphore.WaitOne();
+            //TODO this will probably throw an exception
+            string filename = Helpers.GetString(param.bytes);
+            string[] rawSplit = filename.Split(new char[] { ' ' });
+            filename = rawSplit[0].Substring(2);
             //check to see if read/write request is valid
             switch(checkReadWrite(param.bytes))
             {
-                case Constants.RequstType.Read:
-                    read(param.client);
+                case Constants.OpCode.Read:
+                    read(param.client,filename);
                     break;
-                case Constants.RequstType.Write:
-                    write(param.client);
+                case Constants.OpCode.Write:
+                    write(param.client,filename);
                     break;
-                case Constants.RequstType.Invalid:
-                    transmitError(param.client, Constants.ErrorCode.UnknownTransferID);
+                case Constants.OpCode.Error:
+                    transmitError(param.client, Constants.ErrorCode.UnknownTransferID,"Invalid request");
                     break;
             }
             param.client.Close();
@@ -84,61 +88,105 @@ namespace TFTP
             Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
             client.Send(toSend,4);
         }
-        //TODO
-        private Constants.RequstType checkReadWrite(byte[] bytes)
+        private Constants.OpCode checkReadWrite(byte[] bytes)
         {
-            return Constants.RequstType.Read;
+            switch(bytes[1])
+            {
+                case 1: return Constants.OpCode.Read;
+                case 2: return Constants.OpCode.Write;
+                default: return Constants.OpCode.Error;
+            }
         }
-        //TODO
+
+        private bool confirmAwk(byte[] input, short block)
+        {
+            if((input.Length == 4)
+                && (input[0] == 0)
+                && (input[1] == (byte)Constants.OpCode.Acknowledge)
+                && (BitConverter.ToInt16(input,2) == block))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
         private void read(UdpClient client, string filename)
         {
+            byte[] toSend;
+            byte[] input;
             short block = 0;
             //try to open file
             try
             {
-                byte[] toSend = File.ReadAllBytes(filename);
+                toSend = File.ReadAllBytes(filename);
             }
             catch(FileNotFoundException e)
             {
                 transmitError(client, Constants.ErrorCode.FileNotFound, e.Message);
+                return;
             }
             catch(UnauthorizedAccessException e)
             {
                 transmitError(client, Constants.ErrorCode.AccessViolation, e.Message);
+                return;
             }
             catch(Exception e)
             {
                 transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+                return;
             }
-            transmitAwk(client, block);
-
+            while(block*512 < toSend.Length)
+            {
+                int byteLength;
+                //check if last block
+                if(toSend.Length - block < 512)
+                {
+                    byteLength = toSend.Length - block * 512;
+                }
+                else
+                {
+                    byteLength = 512;
+                }
+                client.Send(Helpers.SubArray<byte>(toSend, block * 512, byteLength), byteLength);
+                input = client.Receive(ref _endPoint);
+                //TODO check for timeout
+                if (confirmAwk(input,block)) block++;
+            }
         }
-        //TODO
+
         private void write(UdpClient client, string filename)
         {
-            //Check if file exists here
-            short block = 0;
-            transmitAwk(client, block);
-            List<byte> rawFile = new List<byte>();
-            byte[] input = client.Receive(ref _endPoint);
-            while(input.Length == 516)
+            if (File.Exists(filename))
             {
-                //validate data block here
+                transmitError(client, Constants.ErrorCode.FileAlreadyExists, "File already exists");
+            }
+            else
+            {
+                short block = 0;
                 transmitAwk(client, block);
-                rawFile.AddRange(input);
-                input = client.Receive(ref _endPoint);
-            }
-            try
-            {
-                File.WriteAllBytes(filename, rawFile.ToArray());
-            }
-            catch(UnauthorizedAccessException e)
-            {
-                transmitError(client,Constants.ErrorCode.AccessViolation,e.Message);
-            }
-            catch(Exception e)
-            {
-                transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+                List<byte> rawFile = new List<byte>();
+                byte[] input = client.Receive(ref _endPoint);
+                while (input.Length == 516)
+                {
+                    //validate data block here?
+                    transmitAwk(client, block);
+                    rawFile.AddRange(input);
+                    input = client.Receive(ref _endPoint);
+                    //need to timeout and retransmit here
+                }
+                try
+                {
+                    File.WriteAllBytes(filename, rawFile.ToArray());
+                }
+                catch (UnauthorizedAccessException e)
+                {
+                    transmitError(client, Constants.ErrorCode.AccessViolation, e.Message);
+                }
+                catch (Exception e)
+                {
+                    transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+                }
             }
         }
     }
