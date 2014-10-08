@@ -23,7 +23,7 @@ namespace TFTP
             _endPoint = new IPEndPoint(IPAddress.Any,port);
             _running = true;
             //selected 25 arbitrarially
-            _semaphore = new Semaphore(0, 25);
+            _semaphore = new Semaphore(25, 25);
             loop();
         }
         
@@ -45,8 +45,8 @@ namespace TFTP
             _semaphore.WaitOne();
             //TODO this will probably throw an exception
             string filename = Helpers.GetString(param.bytes);
-            string[] rawSplit = filename.Split(new char[] { ' ' });
-            filename = rawSplit[0].Substring(2);
+            string[] rawSplit = filename.Split(new char[] { (char)0 });
+            filename = rawSplit[1].Substring(1);
             //check to see if read/write request is valid
             switch(checkReadWrite(param.bytes))
             {
