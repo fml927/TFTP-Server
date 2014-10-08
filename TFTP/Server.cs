@@ -10,6 +10,26 @@ namespace TFTP
 {
     class Server
     {
+        public enum OpCode
+        {
+            Read = 1,
+            Write = 2,
+            Data = 3,
+            Acknowledge = 4,
+            Error = 5
+        }
+        public enum ErrorCode
+        {
+            NotDefined = 0,
+            FileNotFound = 1,
+            AccessViolation = 2,
+            DiskFull = 3,
+            IllegalOpeation = 4,
+            UnknownID = 5,
+            FileAlreadyExists = 6,
+            NoSuchUser = 7,
+        }
+
         private bool _running;
         private IPEndPoint _endPoint;
         private Semaphore _semaphore;
@@ -32,12 +52,12 @@ namespace TFTP
                 //I think this blocks, need to check to make sure
                 byte[] bytes = newClient.Receive(ref _endPoint);
                 Thread t = new Thread(new ParameterizedThreadStart(handleClient));
-                t.Start(new Shared.HandleClientParams { client = newClient, bytes = bytes });
+                t.Start(new HandleParams { client = newClient, bytes = bytes });
             }
         }
         public void handleClient(object o)
         {
-            Shared.HandleClientParams param = (Shared.HandleClientParams)o;
+            HandleParams param = (HandleParams)o;
             _semaphore.WaitOne();
             _semaphore.Release();
         }
