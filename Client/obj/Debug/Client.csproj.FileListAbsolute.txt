@@ -1,0 +1,6 @@
+C:\Users\TestVM\Desktop\TFTP\Client\bin\Debug\Client.exe.config
+C:\Users\TestVM\Desktop\TFTP\Client\bin\Debug\Client.exe
+C:\Users\TestVM\Desktop\TFTP\Client\bin\Debug\Client.pdb
+C:\Users\TestVM\Desktop\TFTP\Client\obj\Debug\Client.csprojResolveAssemblyReference.cache
+C:\Users\TestVM\Desktop\TFTP\Client\obj\Debug\Client.exe
+C:\Users\TestVM\Desktop\TFTP\Client\obj\Debug\Client.pdb

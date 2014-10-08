@@ -1,0 +1,1 @@
+C:\Users\TestVM\Desktop\TFTP\TFTP\obj\Debug\Server.csprojResolveAssemblyReference.cache
