@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using System.Net.Sockets;
 using System.Net;
+using System.IO;
 
 namespace TFTP
 {
@@ -42,60 +43,34 @@ namespace TFTP
             HandleParams param = (HandleParams)o;
             _semaphore.WaitOne();
             //check to see if read/write request is valid
-            if (true)
+            switch(checkReadWrite(param.bytes))
             {
-                short block = 0;
-                //while transmitting or receiving
-                while (true)
-                {
-
-                }
+                case Constants.RequstType.Read:
+                    read(param.client);
+                    break;
+                case Constants.RequstType.Write:
+                    write(param.client);
+                    break;
+                case Constants.RequstType.Invalid:
+                    transmitError(param.client, Constants.ErrorCode.UnknownTransferID);
+                    break;
             }
-            //transmit error unknown transfer ID
-            else transmitError(param.client, Constants.ErrorCode.UnknownTransferID);
             param.client.Close();
             _semaphore.Release();
         }
-        private void transmitError(UdpClient client, Constants.ErrorCode error)
+        private void transmitError(UdpClient client, Constants.ErrorCode error, string message)
         {
-            string errorString = "";
-            byte[] errorBytes;
+            byte[] messageBytes;
             byte[] toSend;
-            switch(error)
-            {
-                case Constants.ErrorCode.AccessViolation:
-                    errorString = "Access violation.";
-                    break;
-                case Constants.ErrorCode.DiskFull:
-                    errorString = "Disk full or allocation exceeded.";
-                    break;
-                case Constants.ErrorCode.FileAlreadyExists:
-                    errorString = "File already exists.";
-                    break;
-                case Constants.ErrorCode.FileNotFound:
-                    errorString = "File not found.";
-                    break;
-                case Constants.ErrorCode.IllegalOpeation:
-                    errorString = "Illegal TFTP operation.";
-                    break;
-                case Constants.ErrorCode.NoSuchUser:
-                    errorString = "No such user.";
-                    break;
-                case Constants.ErrorCode.NotDefined:
-                    errorString = "Not defined";
-                    break;
-                case Constants.ErrorCode.UnknownTransferID:
-                    errorString =  "Unknown transfer ID.";
-                    break;
-            }
-            errorBytes = Helpers.GetBytes(errorString);
 
-            toSend = new byte[errorBytes.Length+5];
+            messageBytes = Helpers.GetBytes(message);
+
+            toSend = new byte[messageBytes.Length+5];
             toSend[0] = 0;
             toSend[1] = (byte)Constants.OpCode.Error;
             toSend[2] = 0;
             toSend[3] = (byte)error;
-            Array.Copy(errorBytes, 0, toSend, 4, errorBytes.Length);
+            Array.Copy(messageBytes, 0, toSend, 4, messageBytes.Length);
             toSend[toSend.Length - 1] = 0;
 
             client.Send(toSend,toSend.Length);
@@ -109,6 +84,62 @@ namespace TFTP
             Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
             client.Send(toSend,4);
         }
-    
+        //TODO
+        private Constants.RequstType checkReadWrite(byte[] bytes)
+        {
+            return Constants.RequstType.Read;
+        }
+        //TODO
+        private void read(UdpClient client, string filename)
+        {
+            short block = 0;
+            //try to open file
+            try
+            {
+                byte[] toSend = File.ReadAllBytes(filename);
+            }
+            catch(FileNotFoundException e)
+            {
+                transmitError(client, Constants.ErrorCode.FileNotFound, e.Message);
+            }
+            catch(UnauthorizedAccessException e)
+            {
+                transmitError(client, Constants.ErrorCode.AccessViolation, e.Message);
+            }
+            catch(Exception e)
+            {
+                transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+            }
+            transmitAwk(client, block);
+
+        }
+        //TODO
+        private void write(UdpClient client, string filename)
+        {
+            //Check if file exists here
+            short block = 0;
+            transmitAwk(client, block);
+            List<byte> rawFile = new List<byte>();
+            byte[] input = client.Receive(ref _endPoint);
+            while(input.Length == 516)
+            {
+                //validate data block here
+                transmitAwk(client, block);
+                rawFile.AddRange(input);
+                input = client.Receive(ref _endPoint);
+            }
+            try
+            {
+                File.WriteAllBytes(filename, rawFile.ToArray());
+            }
+            catch(UnauthorizedAccessException e)
+            {
+                transmitError(client,Constants.ErrorCode.AccessViolation,e.Message);
+            }
+            catch(Exception e)
+            {
+                transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+            }
+        }
     }
 }
