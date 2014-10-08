@@ -10,25 +10,7 @@ namespace TFTP
 {
     class Server
     {
-        public enum OpCode
-        {
-            Read = 1,
-            Write = 2,
-            Data = 3,
-            Acknowledge = 4,
-            Error = 5
-        }
-        public enum ErrorCode
-        {
-            NotDefined = 0,
-            FileNotFound = 1,
-            AccessViolation = 2,
-            DiskFull = 3,
-            IllegalOpeation = 4,
-            UnknownID = 5,
-            FileAlreadyExists = 6,
-            NoSuchUser = 7,
-        }
+
 
         private bool _running;
         private IPEndPoint _endPoint;
@@ -44,7 +26,7 @@ namespace TFTP
             loop();
         }
         
-        public void loop()
+        private void loop()
         {
             while(_running)
             {
@@ -55,11 +37,77 @@ namespace TFTP
                 t.Start(new HandleParams { client = newClient, bytes = bytes });
             }
         }
-        public void handleClient(object o)
+        private void handleClient(object o)
         {
             HandleParams param = (HandleParams)o;
             _semaphore.WaitOne();
+            //check to see if read/write request is valid
+            if (true)
+            {
+                short block = 0;
+                //while transmitting or receiving
+                while (true)
+                {
+
+                }
+            }
+            //transmit error unknown transfer ID
+            else transmitError(param.client, Constants.ErrorCode.UnknownTransferID);
+            param.client.Close();
             _semaphore.Release();
+        }
+        private void transmitError(UdpClient client, Constants.ErrorCode error)
+        {
+            string errorString = "";
+            byte[] errorBytes;
+            byte[] toSend;
+            switch(error)
+            {
+                case Constants.ErrorCode.AccessViolation:
+                    errorString = "Access violation.";
+                    break;
+                case Constants.ErrorCode.DiskFull:
+                    errorString = "Disk full or allocation exceeded.";
+                    break;
+                case Constants.ErrorCode.FileAlreadyExists:
+                    errorString = "File already exists.";
+                    break;
+                case Constants.ErrorCode.FileNotFound:
+                    errorString = "File not found.";
+                    break;
+                case Constants.ErrorCode.IllegalOpeation:
+                    errorString = "Illegal TFTP operation.";
+                    break;
+                case Constants.ErrorCode.NoSuchUser:
+                    errorString = "No such user.";
+                    break;
+                case Constants.ErrorCode.NotDefined:
+                    errorString = "Not defined";
+                    break;
+                case Constants.ErrorCode.UnknownTransferID:
+                    errorString =  "Unknown transfer ID.";
+                    break;
+            }
+            errorBytes = Helpers.GetBytes(errorString);
+
+            toSend = new byte[errorBytes.Length+5];
+            toSend[0] = 0;
+            toSend[1] = (byte)Constants.OpCode.Error;
+            toSend[2] = 0;
+            toSend[3] = (byte)error;
+            Array.Copy(errorBytes, 0, toSend, 4, errorBytes.Length);
+            toSend[toSend.Length - 1] = 0;
+
+            client.Send(toSend,toSend.Length);
+        }
+
+        private void transmitAwk(UdpClient client, int block)
+        {
+            byte[] toSend = new byte[4];
+            toSend[0] = 0;
+            toSend[1] = (byte)Constants.OpCode.Acknowledge;
+            Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
+            client.Send(toSend,4);
         }
     
     }
