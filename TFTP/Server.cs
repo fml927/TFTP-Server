@@ -35,6 +35,7 @@ namespace TFTP
                 //I think this blocks, need to check to make sure
                 byte[] bytes = newClient.Receive(ref _endPoint);
                 Thread t = new Thread(new ParameterizedThreadStart(handleClient));
+                t.IsBackground = true;
                 t.Start(new HandleParams { client = newClient, bytes = bytes });
             }
         }

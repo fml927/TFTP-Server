@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TFTP
 {
-    class Helpers
+    static class Helpers
     {
         //Thank you StackOverflow! http://stackoverflow.com/questions/472906/converting-a-string-to-byte-array
         public static byte[] GetBytes(string str)

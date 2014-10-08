@@ -1,1 +1,6 @@
 C:\Users\TestVM\Desktop\TFTP\TFTP\obj\Debug\Server.csprojResolveAssemblyReference.cache
+C:\Users\TestVM\Desktop\TFTP\TFTP\bin\Debug\TFTP.exe.config
+C:\Users\TestVM\Desktop\TFTP\TFTP\bin\Debug\TFTP.exe
+C:\Users\TestVM\Desktop\TFTP\TFTP\bin\Debug\TFTP.pdb
+C:\Users\TestVM\Desktop\TFTP\TFTP\obj\Debug\TFTP.exe
+C:\Users\TestVM\Desktop\TFTP\TFTP\obj\Debug\TFTP.pdb
