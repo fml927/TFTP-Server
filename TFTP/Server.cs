@@ -26,6 +26,7 @@ namespace TFTP
             //selected 25 arbitrarially
             _semaphore = new Semaphore(25, 25);
             _listener = new UdpClient(_endPoint);
+            Console.WriteLine(_endPoint.Address + " " + _endPoint.Port);
             loop();
         }
         
@@ -48,6 +49,7 @@ namespace TFTP
             UdpClient client = new UdpClient(0);
             IPEndPoint endPoint = new IPEndPoint(param.Address, param.Port);
             Console.WriteLine(param.Address + " " + param.Port);
+            Console.WriteLine(client.Client.LocalEndPoint.ToString());
             _semaphore.WaitOne();
             string filename = Helpers.GetString(param.Bytes);
             string[] rawSplit = filename.Split(new char[] { (char)0 });
@@ -165,11 +167,18 @@ namespace TFTP
                 header.CopyTo(send,0);
                 data.CopyTo(send,3);
                 client.Send(send, byteLength+4,endPoint);     
+                if(temp == 0)
+                {
+                    Console.WriteLine(Helpers.GetString(send));
+                    Console.WriteLine("Local endpoint: " + client.Client.LocalEndPoint.ToString());
+                    //Console.WriteLine("Remote endpoint: " + client.Client.RemoteEndPoint.ToString());
+                }
                 input = client.Receive(ref endPoint);
                 if (temp == 0)
                 {
-                    Console.WriteLine(endPoint.Port);
-                    Console.WriteLine(Helpers.GetString(Helpers.SubArray<byte>(input, 2, input.Length - 2)));
+                    Console.WriteLine(endPoint.Address+" "+endPoint.Port);
+                    Console.WriteLine((short)input[3]);
+                    Console.WriteLine(Helpers.GetString(input));
                 }
                     
                 //TODO check for timeout
@@ -198,6 +207,7 @@ namespace TFTP
                     //validate data block here?
                     rawFile.AddRange(Helpers.SubArray<Byte>(input,4,input.Length-4));
                     input = client.Receive(ref endPoint);
+                    Console.WriteLine(client.Client.LocalEndPoint);
                     //need to timeout and retransmit here
                 }
                 //last block
