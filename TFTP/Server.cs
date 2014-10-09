@@ -41,14 +41,15 @@ namespace TFTP
                 t.Start(new HandleParams { Bytes = bytes, Address = _endPoint.Address, Port = _endPoint.Port });
             }
         }
-        //honestly this needs to be a class
+        //TODO honestly this needs to be a class
+        //TODO you need to use sockets, the UdpClient isn't fast enough
         private void handleClient(object o)
         {
             HandleParams param = (HandleParams)o;
             UdpClient client = new UdpClient(0);
             IPEndPoint endPoint = new IPEndPoint(param.Address, param.Port);
+            Console.WriteLine(param.Address + " " + param.Port);
             _semaphore.WaitOne();
-            //TODO this will probably throw an exception
             string filename = Helpers.GetString(param.Bytes);
             string[] rawSplit = filename.Split(new char[] { (char)0 });
             filename = rawSplit[1].Substring(1);
@@ -91,9 +92,11 @@ namespace TFTP
             byte[] toSend = new byte[4];
             toSend[0] = 0;
             toSend[1] = (byte)Constants.OpCode.Acknowledge;
-            Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
-            Console.WriteLine(toSend[0]+" "+toSend[1]+" "+toSend[2]+" "+toSend[3]);
-            client.Send(toSend,4,endPoint);
+            toSend[2] = (byte)(block >> 8);
+            toSend[3] = (byte)block;
+            client.Send(toSend, 4, endPoint);
+            //Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
+            Console.WriteLine(toSend[0]+" "+toSend[1]+" "+toSend[2]+" "+toSend[3]+" "+endPoint.Address+" "+endPoint.Port);
         }
         private Constants.OpCode checkReadWrite(byte[] bytes)
         {
@@ -176,9 +179,9 @@ namespace TFTP
                 byte[] input = client.Receive(ref endPoint);
                 while (input.Length == 516)
                 {
+                    transmitAwk(client, endPoint, block);
                     Console.WriteLine(Helpers.GetString(input));
                     //validate data block here?
-                    transmitAwk(client, endPoint, block);
                     rawFile.AddRange(input);
                     input = client.Receive(ref endPoint);
                     //need to timeout and retransmit here
