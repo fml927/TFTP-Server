@@ -42,7 +42,6 @@ namespace TFTP
             }
         }
         //TODO honestly this needs to be a class
-        //TODO you need to use sockets, the UdpClient isn't fast enough
         private void handleClient(object o)
         {
             HandleParams param = (HandleParams)o;
@@ -95,7 +94,6 @@ namespace TFTP
             toSend[2] = (byte)(block >> 8);
             toSend[3] = (byte)block;
             client.Send(toSend, 4, endPoint);
-            //Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
             Console.WriteLine(toSend[0]+" "+toSend[1]+" "+toSend[2]+" "+toSend[3]+" "+endPoint.Address+" "+endPoint.Port);
         }
         private Constants.OpCode checkReadWrite(byte[] bytes)
@@ -110,6 +108,7 @@ namespace TFTP
 
         private bool confirmAwk(byte[] input, short block)
         {
+            //Console.WriteLine(Helpers.GetString(Helpers.SubArray<byte>(input,2,input.Length-2)));
             if((input.Length == 4)
                 && (input[0] == 0)
                 && (input[1] == (byte)Constants.OpCode.Acknowledge)
@@ -120,7 +119,7 @@ namespace TFTP
 
             return false;
         }
-
+        //TODO take care of the unexpected port error
         private void read(UdpClient client, IPEndPoint endPoint, string filename)
         {
             byte[] toSend;
@@ -150,7 +149,7 @@ namespace TFTP
             {
                 int byteLength;
                 //check if last block
-                if(toSend.Length - block < 512)
+                if(toSend.Length - block * 512 < 512)
                 {
                     byteLength = toSend.Length - block * 512;
                 }
@@ -158,7 +157,13 @@ namespace TFTP
                 {
                     byteLength = 512;
                 }
-                client.Send(Helpers.SubArray<byte>(toSend, block * 512, byteLength), byteLength,endPoint);
+                byte[] header = { 0, (byte)Constants.OpCode.Data, (byte)(block >> 8), (byte)block };
+                byte[] data = Helpers.SubArray<byte>(toSend, block * 512, byteLength);
+                byte[] send = new byte[header.Length+data.Length];
+                header.CopyTo(send,0);
+                data.CopyTo(send,3);
+                client.Send(send, byteLength+4,endPoint);
+                Console.WriteLine(endPoint.Port);
                 input = client.Receive(ref endPoint);
                 //TODO check for timeout
                 if (confirmAwk(input,block)) block++;
@@ -175,14 +180,15 @@ namespace TFTP
             {
                 short block = 0;
                 transmitAwk(client, endPoint, block);
-                List<byte> rawFile = new List<byte>();
                 byte[] input = client.Receive(ref endPoint);
+                List<byte> rawFile = new List<byte>();
+                
                 while (input.Length == 516)
                 {
-                    transmitAwk(client, endPoint, block);
+                    transmitAwk(client, endPoint, block++);
                     Console.WriteLine(Helpers.GetString(input));
                     //validate data block here?
-                    rawFile.AddRange(input);
+                    rawFile.AddRange(Helpers.SubArray<Byte>(input,3,input.Length-4));
                     input = client.Receive(ref endPoint);
                     //need to timeout and retransmit here
                 }
