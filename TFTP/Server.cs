@@ -41,6 +41,7 @@ namespace TFTP
                 t.Start(new HandleParams { Bytes = bytes, Address = _endPoint.Address, Port = _endPoint.Port });
             }
         }
+        //honestly this needs to be a class
         private void handleClient(object o)
         {
             HandleParams param = (HandleParams)o;
@@ -91,6 +92,7 @@ namespace TFTP
             toSend[0] = 0;
             toSend[1] = (byte)Constants.OpCode.Acknowledge;
             Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
+            Console.WriteLine(toSend[0]+" "+toSend[1]+" "+toSend[2]+" "+toSend[3]);
             client.Send(toSend,4,endPoint);
         }
         private Constants.OpCode checkReadWrite(byte[] bytes)
@@ -153,8 +155,8 @@ namespace TFTP
                 {
                     byteLength = 512;
                 }
-                client.Send(Helpers.SubArray<byte>(toSend, block * 512, byteLength), byteLength);
-                input = client.Receive(ref _endPoint);
+                client.Send(Helpers.SubArray<byte>(toSend, block * 512, byteLength), byteLength,endPoint);
+                input = client.Receive(ref endPoint);
                 //TODO check for timeout
                 if (confirmAwk(input,block)) block++;
             }
@@ -171,13 +173,14 @@ namespace TFTP
                 short block = 0;
                 transmitAwk(client, endPoint, block);
                 List<byte> rawFile = new List<byte>();
-                byte[] input = client.Receive(ref _endPoint);
+                byte[] input = client.Receive(ref endPoint);
                 while (input.Length == 516)
                 {
+                    Console.WriteLine(Helpers.GetString(input));
                     //validate data block here?
                     transmitAwk(client, endPoint, block);
                     rawFile.AddRange(input);
-                    input = client.Receive(ref _endPoint);
+                    input = client.Receive(ref endPoint);
                     //need to timeout and retransmit here
                 }
                 try
