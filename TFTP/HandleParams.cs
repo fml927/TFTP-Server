@@ -3,13 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Net.Sockets;
+using System.Net;
 
 namespace TFTP
 {
     class HandleParams
     {
-        public UdpClient client { get; set; }
-        public byte[] bytes { get; set; }
+        public byte[] Bytes { get; set; }
+        public int Port { get; set; }
+        public IPAddress Address {get; set; }
     }
 }

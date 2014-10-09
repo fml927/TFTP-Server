@@ -16,14 +16,16 @@ namespace TFTP
         private bool _running;
         private IPEndPoint _endPoint;
         private Semaphore _semaphore;
+        private UdpClient _listener;
 
         //need to figure out the port thing.  Do I access connections on all ports?  only port 69?
-        public Server(int port)
+        public Server()
         {
-            _endPoint = new IPEndPoint(IPAddress.Any,port);
+            _endPoint = new IPEndPoint(IPAddress.Any,69);
             _running = true;
             //selected 25 arbitrarially
             _semaphore = new Semaphore(25, 25);
+            _listener = new UdpClient(_endPoint);
             loop();
         }
         
@@ -31,39 +33,41 @@ namespace TFTP
         {
             while(_running)
             {
-                UdpClient newClient = new UdpClient(_endPoint);
+                
                 //I think this blocks, need to check to make sure
-                byte[] bytes = newClient.Receive(ref _endPoint);
+                byte[] bytes = _listener.Receive(ref _endPoint);
                 Thread t = new Thread(new ParameterizedThreadStart(handleClient));
                 t.IsBackground = true;
-                t.Start(new HandleParams { client = newClient, bytes = bytes });
+                t.Start(new HandleParams { Bytes = bytes, Address = _endPoint.Address, Port = _endPoint.Port });
             }
         }
         private void handleClient(object o)
         {
             HandleParams param = (HandleParams)o;
+            UdpClient client = new UdpClient(0);
+            IPEndPoint endPoint = new IPEndPoint(param.Address, param.Port);
             _semaphore.WaitOne();
             //TODO this will probably throw an exception
-            string filename = Helpers.GetString(param.bytes);
+            string filename = Helpers.GetString(param.Bytes);
             string[] rawSplit = filename.Split(new char[] { (char)0 });
             filename = rawSplit[1].Substring(1);
             //check to see if read/write request is valid
-            switch(checkReadWrite(param.bytes))
+            switch(checkReadWrite(param.Bytes))
             {
                 case Constants.OpCode.Read:
-                    read(param.client,filename);
+                    read(client, endPoint, filename);
                     break;
                 case Constants.OpCode.Write:
-                    write(param.client,filename);
+                    write(client, endPoint, filename);
                     break;
                 case Constants.OpCode.Error:
-                    transmitError(param.client, Constants.ErrorCode.UnknownTransferID,"Invalid request");
+                    transmitError(client, endPoint, Constants.ErrorCode.UnknownTransferID, "Invalid request");
                     break;
             }
-            param.client.Close();
+            client.Close();
             _semaphore.Release();
         }
-        private void transmitError(UdpClient client, Constants.ErrorCode error, string message)
+        private void transmitError(UdpClient client, IPEndPoint endPoint, Constants.ErrorCode error, string message)
         {
             byte[] messageBytes;
             byte[] toSend;
@@ -78,16 +82,16 @@ namespace TFTP
             Array.Copy(messageBytes, 0, toSend, 4, messageBytes.Length);
             toSend[toSend.Length - 1] = 0;
 
-            client.Send(toSend,toSend.Length);
+            client.Send(toSend,toSend.Length,endPoint);
         }
 
-        private void transmitAwk(UdpClient client, int block)
+        private void transmitAwk(UdpClient client, IPEndPoint endPoint, int block)
         {
             byte[] toSend = new byte[4];
             toSend[0] = 0;
             toSend[1] = (byte)Constants.OpCode.Acknowledge;
             Array.Copy(BitConverter.GetBytes(block),0,toSend,2,2);
-            client.Send(toSend,4);
+            client.Send(toSend,4,endPoint);
         }
         private Constants.OpCode checkReadWrite(byte[] bytes)
         {
@@ -112,7 +116,7 @@ namespace TFTP
             return false;
         }
 
-        private void read(UdpClient client, string filename)
+        private void read(UdpClient client, IPEndPoint endPoint, string filename)
         {
             byte[] toSend;
             byte[] input;
@@ -124,17 +128,17 @@ namespace TFTP
             }
             catch(FileNotFoundException e)
             {
-                transmitError(client, Constants.ErrorCode.FileNotFound, e.Message);
+                transmitError(client, endPoint, Constants.ErrorCode.FileNotFound, e.Message);
                 return;
             }
             catch(UnauthorizedAccessException e)
             {
-                transmitError(client, Constants.ErrorCode.AccessViolation, e.Message);
+                transmitError(client, endPoint, Constants.ErrorCode.AccessViolation, e.Message);
                 return;
             }
             catch(Exception e)
             {
-                transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+                transmitError(client, endPoint, Constants.ErrorCode.NotDefined, e.Message);
                 return;
             }
             while(block*512 < toSend.Length)
@@ -156,22 +160,22 @@ namespace TFTP
             }
         }
 
-        private void write(UdpClient client, string filename)
+        private void write(UdpClient client, IPEndPoint endPoint, string filename)
         {
             if (File.Exists(filename))
             {
-                transmitError(client, Constants.ErrorCode.FileAlreadyExists, "File already exists");
+                transmitError(client, endPoint, Constants.ErrorCode.FileAlreadyExists, "File already exists");
             }
             else
             {
                 short block = 0;
-                transmitAwk(client, block);
+                transmitAwk(client, endPoint, block);
                 List<byte> rawFile = new List<byte>();
                 byte[] input = client.Receive(ref _endPoint);
                 while (input.Length == 516)
                 {
                     //validate data block here?
-                    transmitAwk(client, block);
+                    transmitAwk(client, endPoint, block);
                     rawFile.AddRange(input);
                     input = client.Receive(ref _endPoint);
                     //need to timeout and retransmit here
@@ -182,11 +186,11 @@ namespace TFTP
                 }
                 catch (UnauthorizedAccessException e)
                 {
-                    transmitError(client, Constants.ErrorCode.AccessViolation, e.Message);
+                    transmitError(client, endPoint, Constants.ErrorCode.AccessViolation, e.Message);
                 }
                 catch (Exception e)
                 {
-                    transmitError(client, Constants.ErrorCode.NotDefined, e.Message);
+                    transmitError(client, endPoint, Constants.ErrorCode.NotDefined, e.Message);
                 }
             }
         }

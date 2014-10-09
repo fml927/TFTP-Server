@@ -14,7 +14,7 @@ namespace TFTP
             Console.WriteLine();
             Console.WriteLine("Press any key to close the server.");
 
-            Thread t = new Thread(() => new Server(69));
+            Thread t = new Thread(() => new Server());
             t.IsBackground = true;
             t.Start();
             Console.Read();
