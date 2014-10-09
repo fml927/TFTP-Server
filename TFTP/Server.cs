@@ -122,9 +122,10 @@ namespace TFTP
         //TODO take care of the unexpected port error
         private void read(UdpClient client, IPEndPoint endPoint, string filename)
         {
+            Console.WriteLine(endPoint.Address + " " + endPoint.Port);
             byte[] toSend;
             byte[] input;
-            short block = 0;
+            short block = 1;
             //try to open file
             try
             {
@@ -145,6 +146,7 @@ namespace TFTP
                 transmitError(client, endPoint, Constants.ErrorCode.NotDefined, e.Message);
                 return;
             }
+            int temp = 0;
             while(block*512 < toSend.Length)
             {
                 int byteLength;
@@ -162,11 +164,17 @@ namespace TFTP
                 byte[] send = new byte[header.Length+data.Length];
                 header.CopyTo(send,0);
                 data.CopyTo(send,3);
-                client.Send(send, byteLength+4,endPoint);
-                Console.WriteLine(endPoint.Port);
+                client.Send(send, byteLength+4,endPoint);     
                 input = client.Receive(ref endPoint);
+                if (temp == 0)
+                {
+                    Console.WriteLine(endPoint.Port);
+                    Console.WriteLine(Helpers.GetString(Helpers.SubArray<byte>(input, 2, input.Length - 2)));
+                }
+                    
                 //TODO check for timeout
                 if (confirmAwk(input,block)) block++;
+                temp++;
             }
         }
 
@@ -179,7 +187,7 @@ namespace TFTP
             else
             {
                 short block = 0;
-                transmitAwk(client, endPoint, block);
+                transmitAwk(client, endPoint, block++);
                 byte[] input = client.Receive(ref endPoint);
                 List<byte> rawFile = new List<byte>();
                 
@@ -188,10 +196,15 @@ namespace TFTP
                     transmitAwk(client, endPoint, block++);
                     Console.WriteLine(Helpers.GetString(input));
                     //validate data block here?
-                    rawFile.AddRange(Helpers.SubArray<Byte>(input,3,input.Length-4));
+                    rawFile.AddRange(Helpers.SubArray<Byte>(input,4,input.Length-4));
                     input = client.Receive(ref endPoint);
                     //need to timeout and retransmit here
                 }
+                //last block
+                transmitAwk(client, endPoint, block++);
+                Console.WriteLine(Helpers.GetString(input));
+                //validate data block here?
+                rawFile.AddRange(Helpers.SubArray<Byte>(input, 4, input.Length - 4));
                 try
                 {
                     File.WriteAllBytes(filename, rawFile.ToArray());
