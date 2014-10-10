@@ -24,7 +24,6 @@ namespace TFTP
             //selected 25 arbitrarially
             semaphore = new Semaphore(25, 25);
             _listener = new UdpClient(_endPoint);
-            Console.WriteLine(_endPoint.Address + " " + _endPoint.Port);
             loop();
         }
 

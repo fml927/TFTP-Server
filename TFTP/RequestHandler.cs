@@ -28,10 +28,10 @@ namespace TFTP
             switch (checkReadWrite(request))
             {
                 case Constants.OpCode.Read:
-                    read();
+                    Console.WriteLine("Sent file "+_filename+" ("+read()+" bytes)");
                     break;
                 case Constants.OpCode.Write:
-                    write();
+                    Console.WriteLine("Received file "+_filename+" ("+write()+" bytes)");
                     break;
                 case Constants.OpCode.Error:
                     transmitError(Constants.ErrorCode.UnknownTransferID, "Invalid request");
@@ -65,7 +65,6 @@ namespace TFTP
             toSend[2] = (byte)(block >> 8);
             toSend[3] = (byte)block;
             _client.Send(toSend, 4, _endPoint);
-            Console.WriteLine(toSend[0] + " " + toSend[1] + " " + toSend[2] + " " + toSend[3] + " " + _endPoint.Address + " " + _endPoint.Port);
         }
         private Constants.OpCode checkReadWrite(byte[] bytes)
         {
@@ -78,7 +77,6 @@ namespace TFTP
         }
         private bool confirmAwk(byte[] input, short block)
         {
-            //Console.WriteLine(Helpers.GetString(Helpers.SubArray<byte>(input,2,input.Length-2)));
             if ((input.Length == 4)
                 && (input[0] == 0)
                 && (input[1] == (byte)Constants.OpCode.Acknowledge)
@@ -89,11 +87,9 @@ namespace TFTP
 
             return false;
         }
-        //TODO take care of the unexpected port error
-        private void read()
+        private int read()
         {
-            Console.WriteLine(_endPoint.Address + " " + _endPoint.Port);
-            Console.WriteLine(Helpers.GetString(_request));
+            int byteCount = 0;
             byte[] toSend;
             byte[] input;
             short block = 1;
@@ -105,19 +101,18 @@ namespace TFTP
             catch (FileNotFoundException e)
             {
                 transmitError(Constants.ErrorCode.FileNotFound, e.Message);
-                return;
+                return 0;
             }
             catch (UnauthorizedAccessException e)
             {
                 transmitError(Constants.ErrorCode.AccessViolation, e.Message);
-                return;
+                return 0;
             }
             catch (Exception e)
             {
                 transmitError(Constants.ErrorCode.NotDefined, e.Message);
-                return;
+                return 0;
             }
-            int temp = 0;
             while ((block-1) * 512 < toSend.Length)
             {
                 int byteLength;
@@ -130,34 +125,24 @@ namespace TFTP
                 {
                     byteLength = 512;
                 }
+                byteCount += byteLength;
                 byte[] header = { 0, (byte)Constants.OpCode.Data, (byte)(block >> 8), (byte)block };
                 byte[] data = Helpers.SubArray<byte>(toSend, (block-1) * 512, byteLength);
                 byte[] send = new byte[header.Length + data.Length];
                 header.CopyTo(send, 0);
                 data.CopyTo(send, 4);
                 _client.Send(send, byteLength + 4, _endPoint);
-                if (temp == 0)
-                {
-                    Console.WriteLine(Helpers.GetString(send));
-                    Console.WriteLine("Local endpoint: " + _client.Client.LocalEndPoint.ToString());
-                    //Console.WriteLine("Remote endpoint: " + client.Client.RemoteEndPoint.ToString());
-                }
                 input = _client.Receive(ref _endPoint);
-                if (temp == 0)
-                {
-                    Console.WriteLine(_endPoint.Address + " " + _endPoint.Port);
-                    Console.WriteLine((short)input[3]);
-                    Console.WriteLine(Helpers.GetString(input));
-                }
 
                 //TODO check for timeout
                 if (confirmAwk(input, block)) block++;
-                temp++;
             }
+            return byteCount;
         }
 
-        private void write()
+        private int write()
         {
+            int byteCount = 0;
             if (File.Exists(_filename))
             {
                 transmitError(Constants.ErrorCode.FileAlreadyExists, "File already exists");
@@ -172,18 +157,17 @@ namespace TFTP
                 while (input.Length == 516)
                 {
                     transmitAwk(block++);
-                    Console.WriteLine(Helpers.GetString(input));
                     //validate data block here?
                     rawFile.AddRange(Helpers.SubArray<Byte>(input, 4, input.Length - 4));
+                    byteCount += input.Length - 4;
                     input = _client.Receive(ref _endPoint);
-                    Console.WriteLine(_client.Client.LocalEndPoint);
                     //need to timeout and retransmit here
                 }
                 //last block
                 transmitAwk(block++);
-                Console.WriteLine(Helpers.GetString(input));
                 //validate data block here?
                 rawFile.AddRange(Helpers.SubArray<Byte>(input, 4, input.Length - 4));
+                byteCount += input.Length - 4;
                 try
                 {
                     File.WriteAllBytes(_filename, rawFile.ToArray());
@@ -197,6 +181,7 @@ namespace TFTP
                     transmitError(Constants.ErrorCode.NotDefined, e.Message);
                 }
             }
+            return byteCount;
         }
     }
 }
