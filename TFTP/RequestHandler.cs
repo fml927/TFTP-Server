@@ -14,12 +14,13 @@ namespace TFTP
         private UdpClient _client;
         private IPEndPoint _endPoint;
         private string _filename;
+        private byte[] _request;
 
         public RequestHandler(IPAddress address, int port, byte[] request)
         {
             _client = new UdpClient(0);
             _endPoint = new IPEndPoint(address, port);
-
+            _request = request;
             _filename = Helpers.GetString(request);
             string[] rawSplit = _filename.Split(new char[] { (char)0 });
             _filename = rawSplit[1].Substring(1);
@@ -81,7 +82,7 @@ namespace TFTP
             if ((input.Length == 4)
                 && (input[0] == 0)
                 && (input[1] == (byte)Constants.OpCode.Acknowledge)
-                && (BitConverter.ToInt16(input, 2) == block))
+                && ((short)((input[2] << 8) + input[3]) == block))
             {
                 return true;
             }
@@ -92,6 +93,7 @@ namespace TFTP
         private void read()
         {
             Console.WriteLine(_endPoint.Address + " " + _endPoint.Port);
+            Console.WriteLine(Helpers.GetString(_request));
             byte[] toSend;
             byte[] input;
             short block = 1;
@@ -132,7 +134,7 @@ namespace TFTP
                 byte[] data = Helpers.SubArray<byte>(toSend, block * 512, byteLength);
                 byte[] send = new byte[header.Length + data.Length];
                 header.CopyTo(send, 0);
-                data.CopyTo(send, 3);
+                data.CopyTo(send, 4);
                 _client.Send(send, byteLength + 4, _endPoint);
                 if (temp == 0)
                 {
