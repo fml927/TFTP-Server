@@ -118,20 +118,20 @@ namespace TFTP
                 return;
             }
             int temp = 0;
-            while (block * 512 < toSend.Length)
+            while ((block-1) * 512 < toSend.Length)
             {
                 int byteLength;
                 //check if last block
-                if (toSend.Length - block * 512 < 512)
+                if (toSend.Length - (block-1) * 512 < 512)
                 {
-                    byteLength = toSend.Length - block * 512;
+                    byteLength = toSend.Length - (block - 1) * 512;
                 }
                 else
                 {
                     byteLength = 512;
                 }
                 byte[] header = { 0, (byte)Constants.OpCode.Data, (byte)(block >> 8), (byte)block };
-                byte[] data = Helpers.SubArray<byte>(toSend, block * 512, byteLength);
+                byte[] data = Helpers.SubArray<byte>(toSend, (block-1) * 512, byteLength);
                 byte[] send = new byte[header.Length + data.Length];
                 header.CopyTo(send, 0);
                 data.CopyTo(send, 4);
