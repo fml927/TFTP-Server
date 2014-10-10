@@ -14,9 +14,14 @@ namespace TFTP
             Console.WriteLine();
             Console.WriteLine("Press any key to close the server.");
 
+            //new thread so UI isn't blocked
             Thread t = new Thread(() => new Server());
+
+            //so thread closes with applcation
             t.IsBackground = true;
             t.Start();
+
+            //exit application
             Console.Read();
         }
     }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace TFTP
 {
-    class Constants
+    class Constant
     {
         public enum OpCode
         {
@@ -27,5 +27,8 @@ namespace TFTP
             FileAlreadyExists = 6,
             NoSuchUser = 7,
         }
+        //in millisecond
+        public const int timeout = 10000;
+        public const int maxTimouts = 10;
     }
 }
