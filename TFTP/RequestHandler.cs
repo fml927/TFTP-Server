@@ -34,16 +34,19 @@ namespace TFTP
             _filename = Helper.GetString(request);
             string[] rawSplit = _filename.Split(new char[] { (char)0 });
             _filename = rawSplit[1].Substring(1);
+            int bytes;
 
             //check to see if read/write request is valid
             //TODO printing error conditions will be weird
             switch ((Constant.OpCode)request[1])
             {
                 case Constant.OpCode.Read:
-                    Console.WriteLine("Sent file \""+_filename+"\" ("+read()+" bytes)");
+                    bytes = read();
+                    if (bytes != -1) Console.WriteLine("Sent file \"" + _filename + "\" (" + bytes + " bytes)");
                     break;
                 case Constant.OpCode.Write:
-                    Console.WriteLine("Received file \""+_filename+"\" ("+write()+" bytes)");
+                    bytes = write();
+                    if (bytes != -1) Console.WriteLine("Received file \"" + _filename + "\" (" + bytes + " bytes)");
                     break;
                 case Constant.OpCode.Error:
                     transmitError(Constant.ErrorCode.UnknownTransferID, "Invalid request");
@@ -116,17 +119,17 @@ namespace TFTP
             catch (FileNotFoundException e)
             {
                 transmitError(Constant.ErrorCode.FileNotFound, e.Message);
-                return 0;
+                return -1;
             }
             catch (UnauthorizedAccessException e)
             {
                 transmitError(Constant.ErrorCode.AccessViolation, e.Message);
-                return 0;
+                return -1;
             }
             catch (Exception e)
             {
                 transmitError(Constant.ErrorCode.NotDefined, e.Message);
-                return 0;
+                return -1;
             }
             while ((block-1) * 512 < toSend.Length)
             {
@@ -146,10 +149,21 @@ namespace TFTP
                 byte[] send = new byte[header.Length + data.Length];
                 header.CopyTo(send, 0);
                 data.CopyTo(send, 4);
-                _client.Send(send, byteLength + 4, _endPoint);
-                input = _client.Receive(ref _endPoint);
-
-                //TODO check for timeout
+                do
+                {
+                    _client.Send(send, byteLength + 4, _endPoint);
+                    input = null;
+                    input = _client.Receive(ref _endPoint);
+                    timeouts++;
+                }
+                while (input == null && timeouts <= Constant.maxTimouts);
+                
+                //connection timedout
+                if(input == null)
+                {
+                    Console.WriteLine("Connection timed out");
+                    return -1;
+                }
 
                 //Confirm acknowledgement packet
                 if ((input.Length == 4)
@@ -179,24 +193,32 @@ namespace TFTP
             else
             {
                 short block = 0;
-                transmitAwk(block++);
-                byte[] input = _client.Receive(ref _endPoint);
-                List<byte> rawFile = new List<byte>();
 
-                while (input.Length == 516)
+                byte[] input = null;
+                List<byte> rawFile = new List<byte>();
+                transmitAwk(block++);
+                do
                 {
-                    transmitAwk(block++);
-                    //validate data block here?
+                    do
+                    {
+                        input = null;
+                        input = _client.Receive(ref _endPoint);
+                        timeouts++;
+                        transmitAwk(block++);
+                    }
+                    while (input == null && timeouts <= Constant.maxTimouts);
+
+                    //connection timedout
+                    if (input == null)
+                    {
+                        Console.WriteLine("Connection timedout");
+                        return -1;
+                    }
                     rawFile.AddRange(Helper.SubArray<Byte>(input, 4, input.Length - 4));
                     byteCount += input.Length - 4;
-                    input = _client.Receive(ref _endPoint);
-                    //need to timeout and retransmit here
                 }
-                //last block
-                transmitAwk(block++);
-                //validate data block here?
-                rawFile.AddRange(Helper.SubArray<Byte>(input, 4, input.Length - 4));
-                byteCount += input.Length - 4;
+                while (input.Length == 516);
+
                 try
                 {
                     File.WriteAllBytes(_filename, rawFile.ToArray());
@@ -204,10 +226,12 @@ namespace TFTP
                 catch (UnauthorizedAccessException e)
                 {
                     transmitError(Constant.ErrorCode.AccessViolation, e.Message);
+                    return -1;
                 }
                 catch (Exception e)
                 {
                     transmitError(Constant.ErrorCode.NotDefined, e.Message);
+                    return -1;
                 }
             }
             return byteCount;
