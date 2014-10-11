@@ -10,7 +10,7 @@ namespace TFTP
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Running TFTP server for directory: " + Environment.CurrentDirectory);
+            Console.WriteLine("Running TFTP server on port 69 for directory: " + Environment.CurrentDirectory);
             Console.WriteLine();
             Console.WriteLine("Press any key to close the server.");
 
