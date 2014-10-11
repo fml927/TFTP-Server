@@ -108,14 +108,14 @@ namespace TFTP
         {
             int byteCount = 0;
             int timeouts = 0;
-            byte[] toSend;
+            byte[] byteFile;
             byte[] input;
-            short block = 1;
+            ushort block = 1;
 
             //try to open file
             try
             {
-                toSend = File.ReadAllBytes(_filename);
+                byteFile = File.ReadAllBytes(_filename);
             }
             catch (FileNotFoundException e)
             {
@@ -132,25 +132,35 @@ namespace TFTP
                 transmitError(Constant.ErrorCode.NotDefined, e.Message);
                 return -1;
             }
-            while ((block-1) * 512 < toSend.Length)
+            //if filesize is > 32MB
+            if (byteFile.Length > 33554432)
+            {
+                transmitError(Constant.ErrorCode.IllegalOpeation, "File is to large.  File size: " + byteFile.Length + " bytes, max TFTP transfer size is 33554432 bytes");
+                return -1;
+            }
+            while ((block-1) * 512 < byteFile.Length)
             {
                 int byteLength;
 
                 //check if last block
-                if (toSend.Length - (block-1) * 512 < 512)
+                if (byteFile.Length - (block-1) * 512 < 512)
                 {
-                    byteLength = toSend.Length - (block - 1) * 512;
+                    byteLength = byteFile.Length - (block - 1) * 512;
                 }
                 else
                 {
                     byteLength = 512;
                 }
                 byteCount += byteLength;
-                byte[] header = { 0, (byte)Constant.OpCode.Data, (byte)(block >> 8), (byte)block };
-                byte[] data = Helper.SubArray<byte>(toSend, (block-1) * 512, byteLength);
-                byte[] send = new byte[header.Length + data.Length];
-                header.CopyTo(send, 0);
-                data.CopyTo(send, 4);
+                byte[] send = new byte[byteLength + 4];
+                send[0] = 0;
+                send[1] = (byte)Constant.OpCode.Data;
+                send[2] = (byte)(block >> 8);
+                send[3] = (byte)block;
+                for(int i=4; i<send.Length; i++)
+                {
+                    send[i] = byteFile[(block - 1) * 512 + i-4];
+                }
                 do
                 {
                     _client.Send(send, byteLength + 4, _endPoint);
