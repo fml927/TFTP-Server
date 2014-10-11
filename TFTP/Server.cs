@@ -18,7 +18,6 @@ namespace TFTP
         public Semaphore _semaphore { get; set; }
         private UdpClient _listener;
 
-        //need to figure out the port thing.  Do I access connections on all ports?  only port 69?
         /// <summary>
         /// Creates Server object and begins listening loop
         /// </summary>
@@ -39,8 +38,6 @@ namespace TFTP
         {
             while(true)
             {
-                //I think this blocks, need to check to make sure
-                //TODO reimplement semaphore
                 byte[] bytes = _listener.Receive(ref _endPoint);
                 Thread t = new Thread(() => new RequestHandler(_endPoint.Address,_endPoint.Port,bytes,_semaphore));
 
