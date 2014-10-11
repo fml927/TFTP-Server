@@ -15,7 +15,7 @@ namespace TFTP
     class Server
     {
         private IPEndPoint _endPoint;
-        public Semaphore semaphore { get; set; }
+        public Semaphore _semaphore { get; set; }
         private UdpClient _listener;
 
         //need to figure out the port thing.  Do I access connections on all ports?  only port 69?
@@ -27,7 +27,7 @@ namespace TFTP
             _endPoint = new IPEndPoint(IPAddress.Any, 69);
 
             //selected 25 arbitrarially
-            semaphore = new Semaphore(25, 25);
+            _semaphore = new Semaphore(32, 32);
             _listener = new UdpClient(_endPoint);
             loop();
         }
@@ -42,7 +42,7 @@ namespace TFTP
                 //I think this blocks, need to check to make sure
                 //TODO reimplement semaphore
                 byte[] bytes = _listener.Receive(ref _endPoint);
-                Thread t = new Thread(() => new RequestHandler(_endPoint.Address,_endPoint.Port,bytes));
+                Thread t = new Thread(() => new RequestHandler(_endPoint.Address,_endPoint.Port,bytes,_semaphore));
 
                 //so thread closes with application
                 t.IsBackground = true;

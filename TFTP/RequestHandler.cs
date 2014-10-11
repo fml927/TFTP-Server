@@ -5,7 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace TFTP
 {
@@ -24,8 +24,9 @@ namespace TFTP
         /// <param name="address">Client's IP address</param>
         /// <param name="port">Client's port</param>
         /// <param name="request">Byte array containing initial request</param>
-        public RequestHandler(IPAddress address, int port, byte[] request)
+        public RequestHandler(IPAddress address, int port, byte[] request, Semaphore semaphore)
         {
+            semaphore.WaitOne();
             //create UdpClient and set timeout interval
             _client = new UdpClient(0);
             _client.Client.ReceiveTimeout = Constant.timeout;
@@ -36,15 +37,15 @@ namespace TFTP
             _filename = rawSplit[1].Substring(1);
             int bytes;
 
-            //check to see if read/write request is valid
-            //TODO printing error conditions will be weird
             switch ((Constant.OpCode)request[1])
             {
                 case Constant.OpCode.Read:
+                    Console.WriteLine(address.ToString()+": get "+_filename);
                     bytes = read();
                     if (bytes != -1) Console.WriteLine("Sent file \"" + _filename + "\" (" + bytes + " bytes)");
                     break;
                 case Constant.OpCode.Write:
+                    Console.WriteLine(address.ToString() + ":S put " + _filename);
                     bytes = write();
                     if (bytes != -1) Console.WriteLine("Received file \"" + _filename + "\" (" + bytes + " bytes)");
                     break;
@@ -53,7 +54,7 @@ namespace TFTP
                     break;
             }
             _client.Close();
-            
+            semaphore.Release();
         }
 
         /// <summary>
@@ -102,7 +103,7 @@ namespace TFTP
         /// <summary>
         /// Handles read request from client
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Number of bytes sent, or -1 for error cases</returns>
         private int read()
         {
             int byteCount = 0;
@@ -134,6 +135,7 @@ namespace TFTP
             while ((block-1) * 512 < toSend.Length)
             {
                 int byteLength;
+
                 //check if last block
                 if (toSend.Length - (block-1) * 512 < 512)
                 {
@@ -181,7 +183,7 @@ namespace TFTP
         /// <summary>
         /// Handles write request from client
         /// </summary>
-        /// <returns></returns>
+        /// <returns>Number of bytes received, or -1 for error cases</returns>
         private int write()
         {
             int byteCount = 0;
@@ -196,6 +198,8 @@ namespace TFTP
 
                 byte[] input = null;
                 List<byte> rawFile = new List<byte>();
+
+                //initial acknowledgment
                 transmitAwk(block++);
                 do
                 {
