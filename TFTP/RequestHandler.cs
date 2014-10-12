@@ -181,7 +181,7 @@ namespace TFTP
                 if ((input.Length == 4)
                     && (input[0] == 0)
                     && (input[1] == (byte)Constant.OpCode.Acknowledge)
-                    && ((short)((input[2] << 8) + input[3]) == block))
+                    && ((ushort)((((ushort)input[2]) << 8) + (ushort)input[3])) == block)
                 {
                     block++;
                 }
