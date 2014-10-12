@@ -36,7 +36,11 @@ namespace TFTP
             string[] rawSplit = _filename.Split(new char[] { (char)0 });
             _filename = rawSplit[1].Substring(1);
             int bytes;
-
+            if(rawSplit[2] != "octet")
+            {
+                transmitError(Constant.ErrorCode.IllegalOpeation, "This server only supports octet mode");
+                return;
+            }
             switch ((Constant.OpCode)request[1])
             {
                 case Constant.OpCode.Read:
@@ -181,7 +185,7 @@ namespace TFTP
                 if ((input.Length == 4)
                     && (input[0] == 0)
                     && (input[1] == (byte)Constant.OpCode.Acknowledge)
-                    && ((ushort)((((ushort)input[2]) << 8) + (ushort)input[3])) == block)
+                    && ((((ushort)input[2]) << 8) + (ushort)input[3]) == block)
                 {
                     block++;
                 }
